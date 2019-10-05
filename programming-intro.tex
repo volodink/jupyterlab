@@ -1,0 +1,373 @@
+\documentclass[t]{beamer}
+\usepackage{pgf}
+\usepackage{textcomp}
+\usepackage{listings}
+
+%\usetheme{EastLansing}
+\mode<presentation>
+%\useinnertheme{rounded}
+\useoutertheme{infolines}
+\usecolortheme{spruce}
+\setbeamerfont{block title}{size=\large}
+\setbeamertemplate{itemize subitem}[triangle]
+\setbeamercolor{titlelike}{parent=structure,bg=white!85!MSUgreen}
+\mode<all>
+
+\renewcommand{\emph}[1]{{\color{blue} #1}}
+
+\hypersetup{unicode}
+\usepackage[utf8]{inputenc}
+\usepackage[russian]{babel}
+
+\usepackage{tikz}
+\usetikzlibrary{
+  positioning,
+  fit,
+  decorations.pathreplacing,
+}
+
+\lstset{language=C, keywordstyle=\bfseries\color{green!40!black},
+  commentstyle=\itshape\color{purple!40!black},
+  identifierstyle=\color{blue}, stringstyle=\color{orange},
+  morekeywords={bool, true, false, uint16_t, size_t, parse_result}}
+
+\title[Введение в программирование]
+{
+  Введение в программирование\\
+  CanSat как автоматическая система
+}
+
+\author[Paul Fertser]
+{
+  Паша Ферцер/Paul Fertser\\
+  fercerpav@gmail.com\\
+  \url{http://paulfertser.info/cansat-school}
+}
+
+\date{Cansat Russia 2015}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+\begin{frame}[c]{Постановка задачи}
+\begin{tikzpicture}
+  [block/.style={
+      rectangle,
+      rounded corners,
+      align=center,
+      inner sep=0.5cm,
+      node distance=2cm,
+      draw=red!50!black!50,
+      fill=blue!20
+    },
+  >=stealth, thick]
+\node[block] (temp) {t, \textdegree{}C \\ sensor};
+\node[block] (press) [below=of temp] {P, kPa \\ sensor};
+
+\node[block] (MCU) [fit=(temp)(press), inner sep=0, text width=4cm,
+  left=of temp.north west, anchor=north east, text opacity=0] {MCU
+  \\ Микроконтроллер};
+
+\node at (MCU) {?};
+
+\node[block] (RF) [fit=(MCU), inner sep=0, text width=2cm, left=of MCU] {RF
+  \\ module};
+
+\draw [<->] (temp) -- node[align=center] {Dallas\\1-wire} (temp.west -| MCU.east);
+\draw [->] (press) -- node[auto,swap] {Analog} (press.west -| MCU.east);
+
+\draw [->] (MCU) -- node (txline) {} (RF)
+	node[very near start, above] {Tx} node[very near end, above] {Rx};
+\node [above of=txline,align=center] {UART};
+\draw [->,dashed] ([yshift=-1cm]RF.east) -- ([yshift=-1cm]MCU.west)
+	node[very near start, above] {Tx} node[very near end, above] {Rx};
+
+\draw [decorate, decoration={brace, raise=0.5cm, amplitude=0.3cm}] (RF) -- (MCU);
+%\draw [->,dashed] (RF.east) +(0,-1) -- ($(MCU.west) + (0,-1)$)
+%	node[very near start, above] {Tx} node[very near end, above] {Rx};
+\end{tikzpicture}
+\end{frame}
+
+\begin{frame}{Автоматические системы}
+\begin{itemize}
+\item Механические (толкатели, валы, и т.д.)
+\item Электрические (концевые выключатели, реле и т.д.)
+\item Электронные (на основе радиоламп/транзисторов)
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Электронные системы}
+  \begin{block}{Варианты реализации}
+  \begin{itemize}
+  \item Дискретные компоненты
+  \item ASIC
+  \item FPGA/CPLD (ПЛИС)
+  \item Универсальный вычислитель (компьютер)
+  \end{itemize}
+  \end{block}
+\end{frame}
+
+\begin{frame}{История вычислительных устройств}
+  \begin{block}{$\lambda$-исчисление}
+    Разработано Алонсо Чёрчем для решения вопроса о <<механической
+    вычислимости>>
+
+    Языки программирования: LISP, Erlang, OCaml, Haskell
+  \end{block}
+  \begin{block}{Универсальная машина Тьюринга}
+    Первая концепция компьютера с хранимыми программами (выполняет
+    разные вычисления в зависимости от записанной программы)
+
+    Языки программирования: ассемблеры, C, COBOL, Pascal
+  \end{block}
+
+  \begin{block}{}
+    \begin{center}
+      Эквивалентны с математической точки зрения
+    \end{center}
+  \end{block}
+\end{frame}
+
+\begin{frame}[fragile]{Функции}
+В <<математическом смысле>> (чистые, без побочных эффектов):
+$$
+f(a,b) = a^2 + b + 1
+$$
+
+В <<компьютерном смысле>>:
+\begin{lstlisting}
+int printsum(int a, int b)
+{
+  int c = a + b;
+  printf("%d", c);
+  return c;
+}
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}{Создание функций}
+  \begin{block}{Вам нужна отдельная функция если:}
+    \begin{itemize}
+    \item этот код нужен больше, чем в одном месте
+    \item исходная задача описывает её отдельно
+    \item имеющаяся функция слишком длинная (> $\approx$25 строк)
+    \item вычисления можно отделить от побочных эффектов
+    \end{itemize}
+  \end{block}
+
+  \begin{block}{Рекомендации}
+Имя функции должно явно указывать на то, что она делает, и есть ли у
+неё побочные эффекты. Для <<чистых>> (не производящих эффекты и не
+зависящих от глобальных переменных) функций пишите unit-test'ы.
+  \end{block}
+\end{frame}
+
+\begin{frame}{Практическая реализация}
+  \begin{columns}
+    \column{.5\textwidth}
+    \begin{block}{$\lambda$-исчисление}
+      \begin{itemize}
+      \item оперирует функциями без побочных эффектов
+      \item[+] возможность математически строгой верификации
+      \item[+] элегантные решения
+      \item[---] производительность
+      \item[---] сложность применения на реальных устройствах
+      \end{itemize}
+    \end{block}
+
+    \column{.5\textwidth}
+    \begin{block}{Машина Тьюринга}
+      \begin{itemize}
+      \item функции с побочными эффектами
+      \item [+] близость к аппаратному обеспечению
+      \item [+] наличие большого количества инструментов
+      \item [---] сложности с обеспечением надёжности
+      \item [---] более запутанный исходный код
+      \end{itemize}
+    \end{block}
+    
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Симуляция}
+\Large
+Симуляция микроконтроллеров:
+
+  \begin{itemize}
+  \item VMLAB (\url{http://www.amctools.com})
+  \item HAPSIM + AVR Studio 4 (\url{http://www.helmix.at/hapsim})
+  \item Proteus VSM (\$)
+  \end{itemize}
+
+Симуляция схем:
+
+  \begin{itemize}
+  \item Qucs (\url{http://qucs.sf.net})
+  \item Multisim (\$)
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Переменные в C}
+  Любая переменная имеет:
+  \begin{itemize}
+  \item имя
+  \item тип, размер
+  \item адрес
+  \item область видимости
+    \begin{itemize}
+    \item локальная
+    \item глобальная
+    \end{itemize}
+  \item время жизни (только для локальных переменных)
+    \begin{itemize}
+    \item автоматическая (по умолчанию)
+    \item статическая
+    \end{itemize}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Булевые операции}
+\Large
+  \begin{itemize}
+  \item \emph{AND} (\emph{\&} (\emph{\&\&} для лог. значений),
+    \emph{$\land$}, конъюнкция)
+  \item \emph{OR} (\emph{|} (\emph{||} для лог. значений),
+    \emph{$\lor$}, дизъюнкция)
+  \item \emph{NOT} (\emph{\~{}} (\emph{!} для лог. значений), \emph{$\lnot$}, отрицание)
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Управляющие конструкции в языке C}
+  \begin{itemize}
+  \item \emph{\{\}} --- объединение нескольких действий в блок (действие)\\
+    \lstinline{\{ <action1>; <action2>; \}}
+  \item \emph{if} --- условное выполнение\\
+    \lstinline{if (<condition>) <action1>; [else <action2>;]}
+  \item \emph{while} --- оператор цикла\\
+    \lstinline{while (<condition>) <action>;}
+  \item \emph{for} --- оператор цикла\\
+    \lstinline{for (<action1>; <condition>; <action2>) <action3>;}
+  \item \emph{do-while} --- оператор цикла\\
+    \lstinline{do <action>; while (<condition>);}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Пример программы на C99, AVR}
+\begin{lstlisting}
+...
+#define LED_PIN 4
+...
+void init_hardware(void)
+{
+  DDRA |= 1 << LED_PIN;
+  PORTA |= 1 << LED_PIN;
+  _delay_ms(1000);
+  PORTA &= ~(1 << LED_PIN);
+  ...
+  UCSR0B |= (1<<RXEN) | (1<<UDRIE0);
+  ...
+}
+...
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{Пример программы...}
+\begin{lstlisting}
+...
+int main(void)
+{
+  init_hardware();
+  while (1) {
+    if (buf_ready) {
+      enum parse_result r =
+        parse_packet(buf, sizeof(buf));
+      buf_ready = false;
+      execute_action(r);
+    }
+    ...
+  }
+  return 0;
+}
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{Пример программы...}
+\begin{lstlisting}
+#define BUF_SIZE 16
+volatile char buf[BUF_SIZE];
+size_t buf_idx;
+volatile bool buf_ready;
+...
+ISR(USART0_RX_vect)
+{
+  buf_ready = false;
+  buf[buf_idx++] = UDR0;
+  if (buf_idx == sizeof(buf)) {
+    buf_ready = true;
+    buf_idx = 0;
+  }
+}
+...
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{Пример программы...}
+\begin{lstlisting}
+...
+enum parse_result parse_packet(const char b[],
+                               size_t size)
+{
+  uint16_t crc = crc16(b, size);
+  if (crc != (b[0] & (b[1] << 8)))
+    return CRC_ERROR;
+  switch (b[2]) {
+    ...
+    case 'S': return START_ENGINE;
+    ...
+    default: return UNKNOWN_PACKET;
+  }
+}
+...
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}{Увеличение надёжности императивных программ}
+  \begin{block}{Возможные способы}
+  \begin{itemize}
+  \item отделять чистые функции от побочных эффектов
+  \item выполнять требования MISRA C
+  \item применять статические анализаторы кода (Cppcheck, Coverity)
+  \item использовать языки со строгой типизацией (напр, C++, Ada)
+  \end{itemize}
+  \end{block}
+\end{frame}
+
+\begin{frame}{Литература}
+\Large
+
+\url{http://paulfertser.info/c1year.shtml}
+
+  \begin{itemize}
+  \item В. Подбельский, С. Фомин
+  \item Керниган, Ричи
+  \item \url{http://forum.easyelectronics.ru}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Домашнее задание}
+\Large
+  Написать программу, считывающую с клавиатуры 32-битное беззнаковое
+  число \emph{n}, числа \emph{a} и \emph{b} и выводящую на экран
+  число, равное исходному \emph{n}, но с установленным битом номер
+  \emph{a} и снятым битом номер \emph{b}.
+  \vfill
+
+  Разобраться во всех элементах синтаксиса C99 и AVR libc,
+  использованных в примере программы в этой презентации. Найти и
+  описать возможные последствия от имеющегося в примере \emph{race
+    condition}.
+\end{frame}
+\end{document}
